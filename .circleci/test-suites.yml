@@ -1,0 +1,6 @@
+---
+name: project tests
+discover: cd project && find tests -type f -name 'test_*.py' | sort
+run: cd project && python -m pytest -p no:cacheprovider -o junit_family=xunit1 --junitxml="<< outputs.junit >>" << test.atoms >>
+options:
+  store-test-results: true
