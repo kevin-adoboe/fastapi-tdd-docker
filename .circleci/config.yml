@@ -1,0 +1,46 @@
+version: 2.1
+
+functions:
+  python: github.com/circleci-functions/setup-python@v0.5.0
+
+jobs:
+  test-project:
+    docker:
+      - image: cimg/base:stable
+    environment:
+      # Tests use SQLite, matching the existing GitHub Actions workflow.
+      ENVIRONMENT: dev
+      TESTING: "0"
+      DATABASE_URL: sqlite://sqlite.db
+      DATABASE_TEST_URL: sqlite://sqlite.db
+    steps:
+      - checkout
+      - python:
+          with:
+            python-version: "3.13.3"
+      - python/install-packages:
+          with:
+            app-dir: project
+            pip-dependency-file: requirements-dev.txt
+            # aiosqlite is unpinned upstream; 0.22+ breaks tortoise-orm 0.25.0 on SQLite.
+            args: aiosqlite==0.21.0
+      - run:
+          name: Test
+          command: circleci testsuite run "fastapi tests"
+      - run:
+          name: Flake8
+          working_directory: project
+          command: python -m flake8 .
+      - run:
+          name: Black
+          working_directory: project
+          command: python -m black --exclude=migrations . --check
+      - run:
+          name: isort
+          working_directory: project
+          command: python -m isort . --check-only
+
+workflows:
+  main:
+    jobs:
+      - test-project
