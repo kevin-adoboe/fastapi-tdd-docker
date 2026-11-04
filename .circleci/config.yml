@@ -1,0 +1,56 @@
+version: 2.1
+
+jobs:
+  project:
+    docker:
+      - image: cimg/python:3.13
+      - image: cimg/postgres:17.11
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: web_test
+    working_directory: ~/repo/project
+    environment:
+      ENVIRONMENT: dev
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/web_test
+      DATABASE_TEST_URL: postgres://postgres:postgres@localhost:5432/web_test
+    steps:
+      - checkout:
+          path: ~/repo
+      - restore_cache:
+          keys:
+            - pip-v1-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+      - run:
+          name: Install dependencies
+          command: |
+            python -m venv ~/venv
+            . ~/venv/bin/activate
+            pip install -r requirements-dev.txt
+      - save_cache:
+          key: pip-v1-{{ checksum "requirements.txt" }}-{{ checksum "requirements-dev.txt" }}
+          paths:
+            - ~/venv
+      - run:
+          name: Wait for Postgres
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
+      - run:
+          name: Test
+          command: |
+            . ~/venv/bin/activate
+            circleci testsuite run "pytest"
+      - store_test_results:
+          path: test-reports
+      - run:
+          name: Flake8
+          command: . ~/venv/bin/activate && flake8 .
+      - run:
+          name: Black
+          command: . ~/venv/bin/activate && black . --check
+      - run:
+          name: isort
+          command: . ~/venv/bin/activate && isort . --check-only
+
+workflows:
+  ci:
+    jobs:
+      - project

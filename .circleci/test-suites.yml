@@ -1,0 +1,5 @@
+name: pytest
+discover: find tests -type f -name 'test*.py'
+run: python -m pytest -p no:cacheprovider --no-header --quiet --tb=short --override-ini=junit_family=legacy --junit-xml="<< outputs.junit >>" << test.atoms >>
+outputs:
+  junit: test-reports/junit.xml
