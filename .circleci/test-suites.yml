@@ -1,0 +1,9 @@
+name: pytest
+discover: cd project && find tests -type f -name 'test_*.py'
+run: |
+  cd project
+  status=0
+  python -m pytest --disable-pytest-warnings --no-header --quiet --tb=short --override-ini=junit_family=legacy --junit-xml="<< outputs.junit >>" << test.atoms >> || status=$?
+  mkdir -p ../test-results
+  cp "<< outputs.junit >>" "../test-results/pytest-$(basename "<< outputs.junit >>").xml" || true
+  exit $status
