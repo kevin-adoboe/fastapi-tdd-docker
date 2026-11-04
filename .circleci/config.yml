@@ -1,0 +1,53 @@
+version: 2.1
+
+jobs:
+  test-project:
+    docker:
+      - image: cimg/base:stable
+      - image: cimg/postgres:17.11
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: web_test
+    working_directory: ~/repo/project
+    environment:
+      ENVIRONMENT: dev
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/web_test
+      DATABASE_TEST_URL: postgres://postgres:postgres@localhost:5432/web_test
+    steps:
+      - checkout:
+          path: ~/repo
+      - setup-python:
+          with:
+            python-version: "3.13.3"
+      - setup-python/install-packages:
+          with:
+            pip-dependency-file: requirements-dev.txt
+      - run:
+          name: Wait for Postgres
+          command: |
+            for i in $(seq 1 30); do
+              (echo > /dev/tcp/localhost/5432) 2>/dev/null && exit 0
+              sleep 1
+            done
+            echo "Postgres did not start" && exit 1
+      - run:
+          name: Test
+          command: circleci testsuite run "pytest"
+      - run:
+          name: Lint (flake8)
+          command: python -m flake8 .
+      - run:
+          name: Lint (black)
+          command: python -m black --exclude=migrations . --check
+      - run:
+          name: Lint (isort)
+          command: python -m isort . --check-only
+
+workflows:
+  main:
+    jobs:
+      - test-project
+
+functions:
+  setup-python: github.com/circleci-functions/setup-python@v0.5.0
