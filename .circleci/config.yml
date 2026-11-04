@@ -1,0 +1,60 @@
+version: 2.1
+
+jobs:
+  test-project:
+    docker:
+      - image: cimg/python:3.13
+        environment:
+          ENVIRONMENT: dev
+          TESTING: 0
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/web_dev
+          DATABASE_TEST_URL: postgres://postgres:postgres@localhost:5432/web_test
+      - image: cimg/postgres:17.11
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: web_test
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - pip-v1-{{ checksum "project/requirements.txt" }}-{{ checksum "project/requirements-dev.txt" }}
+      - run:
+          name: Install dependencies
+          working_directory: project
+          command: |
+            python -m venv ~/venv
+            . ~/venv/bin/activate
+            pip install --upgrade pip
+            pip install -r requirements-dev.txt
+      - save_cache:
+          key: pip-v1-{{ checksum "project/requirements.txt" }}-{{ checksum "project/requirements-dev.txt" }}
+          paths:
+            - ~/venv
+      - run:
+          name: Wait for Postgres
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
+      - run:
+          name: Run tests
+          command: |
+            . ~/venv/bin/activate
+            circleci testsuite run "pytest"
+      - store_test_results:
+          path: ~/test-results
+      - run:
+          name: Lint (flake8)
+          working_directory: project
+          command: . ~/venv/bin/activate && flake8 .
+      - run:
+          name: Lint (black)
+          working_directory: project
+          command: . ~/venv/bin/activate && black --exclude=migrations . --check
+      - run:
+          name: Lint (isort)
+          working_directory: project
+          command: . ~/venv/bin/activate && isort . --check-only
+
+workflows:
+  main:
+    jobs:
+      - test-project
